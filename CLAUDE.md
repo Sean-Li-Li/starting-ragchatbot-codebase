@@ -29,6 +29,27 @@ chmod +x run.sh && ./run.sh
 cd backend && uv run uvicorn app:app --reload --port 8000
 ```
 
+### Code Quality & Development
+```bash
+# Format code (black + isort)
+./scripts/format.sh
+
+# Check code quality (linting)
+./scripts/lint.sh
+
+# Run tests
+./scripts/test.sh
+
+# Complete quality check (format + lint + test)
+./scripts/quality-check.sh
+
+# Individual tool commands
+uv run black .                    # Format with black
+uv run isort .                    # Sort imports
+uv run flake8 .                   # Lint with flake8
+cd backend && uv run pytest -v    # Run tests
+```
+
 ### Access Points
 - Web Interface: http://localhost:8000
 - API Documentation: http://localhost:8000/docs
@@ -64,6 +85,15 @@ The main orchestrator that coordinates:
 - Vector embeddings use sentence-transformers model
 - Session state is managed in-memory (not persistent across restarts)
 - The application serves both API endpoints and static frontend files
+
+## Code Quality Standards
+
+- **Black**: Python code formatter (88 character line length)
+- **isort**: Import sorting (compatible with black)  
+- **Flake8**: Linting and code quality checks
+- **Pytest**: Testing framework
+- All Python code must pass formatting, linting, and tests before commits
+- Use `./scripts/quality-check.sh` to run all checks at once
 
 ## Package Management Rules
 
