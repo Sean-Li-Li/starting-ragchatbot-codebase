@@ -270,6 +270,123 @@ def mock_tool_manager():
 
 
 # ============================================================================
+# FastAPI Test Fixtures
+# ============================================================================
+
+@pytest.fixture
+def mock_rag_system():
+    """Mock RAG system for API testing without dependencies."""
+    mock_rag = Mock()
+    
+    # Mock successful query response
+    mock_rag.query.return_value = (
+        "This is a test response about computer use capabilities.",
+        ["Building Towards Computer Use with Anthropic - Lesson 0"]
+    )
+    
+    # Mock course analytics
+    mock_rag.get_course_analytics.return_value = {
+        "total_courses": 1,
+        "course_titles": ["Building Towards Computer Use with Anthropic"]
+    }
+    
+    # Mock session manager
+    mock_session_manager = Mock()
+    mock_session_manager.create_session.return_value = "test_session_123"
+    mock_session_manager.clear_session.return_value = None
+    mock_rag.session_manager = mock_session_manager
+    
+    return mock_rag
+
+@pytest.fixture
+def test_app(mock_rag_system):
+    """Create a test FastAPI app with mocked dependencies."""
+    from fastapi import FastAPI
+    from fastapi.middleware.cors import CORSMiddleware
+    from pydantic import BaseModel
+    from typing import List, Optional
+    
+    # Create test app without static file mounting to avoid filesystem issues
+    app = FastAPI(title="Test Course Materials RAG System")
+    
+    # Add CORS middleware
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=["*"],
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
+    
+    # Pydantic models (same as main app)
+    class QueryRequest(BaseModel):
+        query: str
+        session_id: Optional[str] = None
+
+    class QueryResponse(BaseModel):
+        answer: str
+        sources: List[str]
+        session_id: str
+
+    class CourseStats(BaseModel):
+        total_courses: int
+        course_titles: List[str]
+    
+    # Add API endpoints (same as main app but with mocked dependencies)
+    @app.post("/api/query", response_model=QueryResponse)
+    async def query_documents(request: QueryRequest):
+        from fastapi import HTTPException
+        try:
+            session_id = request.session_id
+            if not session_id:
+                session_id = mock_rag_system.session_manager.create_session()
+            
+            answer, sources = mock_rag_system.query(request.query, session_id)
+            
+            return QueryResponse(
+                answer=answer,
+                sources=sources,
+                session_id=session_id
+            )
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=str(e))
+
+    @app.get("/api/courses", response_model=CourseStats)
+    async def get_course_stats():
+        from fastapi import HTTPException
+        try:
+            analytics = mock_rag_system.get_course_analytics()
+            return CourseStats(
+                total_courses=analytics["total_courses"],
+                course_titles=analytics["course_titles"]
+            )
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=str(e))
+
+    @app.delete("/api/session/{session_id}")
+    async def clear_session(session_id: str):
+        from fastapi import HTTPException
+        try:
+            mock_rag_system.session_manager.clear_session(session_id)
+            return {"message": "Session cleared successfully"}
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=str(e))
+    
+    # Simple root endpoint for testing static file serving concept
+    @app.get("/")
+    async def read_root():
+        return {"message": "RAG System API is running"}
+    
+    return app
+
+@pytest.fixture
+def test_client(test_app):
+    """Create a test client for API testing."""
+    from fastapi.testclient import TestClient
+    return TestClient(test_app)
+
+
+# ============================================================================
 # Parameterized Test Data
 # ============================================================================
 
